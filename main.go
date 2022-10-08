@@ -32,45 +32,49 @@ type ItemResult struct {
 }
 
 func main() {
+	// initialize the output structure
+	results.ContentLength = make(map[string]int)
+	results.TotalContentLength = 0
+
 	// create an http client, a list of urls and a channel to
 	// pass url fetch results back
 	client := new(http.Client)
 	ch := make(chan *ItemResult)
 
-	results.ContentLength = make(map[string]int)
-
 	// fetch the contents of the list of urls in parallel
 	for i := 0; i < len(webPages); i++ {
-		go fetch(client, webPages[i], ch)
+		go worker(client, webPages[i], ch)
 	}
 
-	// print out the results as soon as they come in
-	//  (here we could write the data to disk if required)
+	// store the results as soon as they come in
 	for i := 0; i < len(webPages); i++ {
 		output := <-ch
-		fmt.Printf("%s,\t%d bytes\n", output.Url, output.ContentLength)
+		// fmt.Printf("%s,\t%d bytes\n", output.Url, output.ContentLength)
 		results.ContentLength[output.Url] = output.ContentLength
 		results.TotalContentLength = results.TotalContentLength + output.ContentLength
 	}
 
-	fmt.Print(results)
+	for key, element := range results.ContentLength {
+		fmt.Println(key, "-", element)
+	}
+	fmt.Println("\nTotalContentLength =", results.TotalContentLength)
 
 }
 
-func fetch(client *http.Client, url string, ch chan *ItemResult) {
+func worker(client *http.Client, url string, ch chan *ItemResult) {
 	result := ItemResult{url, -1}
 
 	// get the url
 	response, err := client.Get("https://" + url)
 	if err != nil {
-		fmt.Println(err, url)
+		// fmt.Println(err, url)
 		ch <- &result
 		return
 	}
 
 	// check the http server response was OK
 	if response.Status != "200 OK" {
-		fmt.Println(response.Status, url)
+		// fmt.Println(response.Status, url)
 		ch <- &result
 		return
 	}
@@ -78,7 +82,7 @@ func fetch(client *http.Client, url string, ch chan *ItemResult) {
 	// read the response body
 	b, err := ioutil.ReadAll(response.Body)
 	if err != nil {
-		fmt.Println(err, url)
+		// fmt.Println(err, url)
 		ch <- &result
 		return
 	}
