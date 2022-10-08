@@ -28,7 +28,6 @@ var (
 		TotalContentLength int
 
 		// extra information for error
-		Err string
 	}
 )
 
@@ -37,6 +36,8 @@ type ItemResult struct {
 	ContentLength int
 	Err           string
 }
+
+const time_out = 60
 
 func main() {
 	// initialize the output structure
@@ -48,7 +49,7 @@ func main() {
 	client := new(http.Client)
 	ch := make(chan *ItemResult)
 
-	timer := time.AfterFunc(time.Second*5, func() {
+	timer := time.AfterFunc(time.Second*time_out, func() {
 		log.Println("out of time")
 		os.Exit(1)
 	})
@@ -65,13 +66,13 @@ func main() {
 		// fmt.Printf("%s,\t%d bytes\n", output.Url, output.ContentLength)
 		results.ContentLength[output.Url] = output.ContentLength
 		results.TotalContentLength = results.TotalContentLength + output.ContentLength
-		results.Err = output.Err
 	}
 
 	for key, element := range results.ContentLength {
 		fmt.Println(key, "-", element)
 	}
 	fmt.Println("\nTotalContentLength =", results.TotalContentLength)
+	fmt.Println(results)
 
 }
 
@@ -82,7 +83,7 @@ func worker(client *http.Client, url string, ch chan *ItemResult) {
 	response, err := client.Get("https://" + url)
 	if err != nil {
 		// fmt.Println(err, url)
-		result.Err = err
+		result.Err = err.Error()
 		ch <- &result
 		return
 	}
@@ -90,7 +91,7 @@ func worker(client *http.Client, url string, ch chan *ItemResult) {
 	// check the http server response was OK
 	if response.Status != "200 OK" {
 		// fmt.Println(response.Status, url)
-		result.Err = err
+		result.Err = err.Error()
 		ch <- &result
 		return
 	}
@@ -99,7 +100,7 @@ func worker(client *http.Client, url string, ch chan *ItemResult) {
 	b, err := ioutil.ReadAll(response.Body)
 	if err != nil {
 		// fmt.Println(err, url)
-		result.Err = err
+		result.Err = err.Error()
 		ch <- &result
 		return
 	}
@@ -107,4 +108,5 @@ func worker(client *http.Client, url string, ch chan *ItemResult) {
 	// pass the result back to caller via a channel
 	result.ContentLength = len(string(b))
 	ch <- &result
+	return
 }
