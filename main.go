@@ -3,7 +3,10 @@ package main
 import (
 	"fmt"
 	"io/ioutil"
+	"log"
 	"net/http"
+	"os"
+	"time"
 )
 
 var (
@@ -23,12 +26,16 @@ var (
 
 		// accumulate here the content length of all pages
 		TotalContentLength int
+
+		// extra information for error
+		Err string
 	}
 )
 
 type ItemResult struct {
 	Url           string
 	ContentLength int
+	Err           string
 }
 
 func main() {
@@ -41,6 +48,12 @@ func main() {
 	client := new(http.Client)
 	ch := make(chan *ItemResult)
 
+	timer := time.AfterFunc(time.Second*5, func() {
+		log.Println("out of time")
+		os.Exit(1)
+	})
+	defer timer.Stop()
+
 	// fetch the contents of the list of urls in parallel
 	for i := 0; i < len(webPages); i++ {
 		go worker(client, webPages[i], ch)
@@ -52,6 +65,7 @@ func main() {
 		// fmt.Printf("%s,\t%d bytes\n", output.Url, output.ContentLength)
 		results.ContentLength[output.Url] = output.ContentLength
 		results.TotalContentLength = results.TotalContentLength + output.ContentLength
+		results.Err = output.Err
 	}
 
 	for key, element := range results.ContentLength {
@@ -62,12 +76,13 @@ func main() {
 }
 
 func worker(client *http.Client, url string, ch chan *ItemResult) {
-	result := ItemResult{url, -1}
+	result := ItemResult{url, -1, ""}
 
 	// get the url
 	response, err := client.Get("https://" + url)
 	if err != nil {
 		// fmt.Println(err, url)
+		result.Err = err
 		ch <- &result
 		return
 	}
@@ -75,6 +90,7 @@ func worker(client *http.Client, url string, ch chan *ItemResult) {
 	// check the http server response was OK
 	if response.Status != "200 OK" {
 		// fmt.Println(response.Status, url)
+		result.Err = err
 		ch <- &result
 		return
 	}
@@ -83,6 +99,7 @@ func worker(client *http.Client, url string, ch chan *ItemResult) {
 	b, err := ioutil.ReadAll(response.Body)
 	if err != nil {
 		// fmt.Println(err, url)
+		result.Err = err
 		ch <- &result
 		return
 	}
