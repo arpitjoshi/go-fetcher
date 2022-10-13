@@ -3,7 +3,6 @@ package main
 import (
 	"fmt"
 	"io/ioutil"
-	"log"
 	"net/http"
 	"os"
 	"time"
@@ -37,7 +36,7 @@ type ItemResult struct {
 	Err           string
 }
 
-const time_out = 60
+const time_out = 1
 
 func main() {
 	// initialize the output structure
@@ -50,8 +49,8 @@ func main() {
 	ch := make(chan *ItemResult)
 
 	timer := time.AfterFunc(time.Second*time_out, func() {
-		log.Println("out of time")
-		os.Exit(1)
+		fmt.Println("out of time")
+		os.Exit(0)
 	})
 	defer timer.Stop()
 
