@@ -16,7 +16,8 @@ var (
 		"amazon.com",
 		"github.com",
 		"gitlab.com",
-		"bitnz.com",
+		// "bitnz.com",
+		// "random-website-name.com",
 	}
 
 	results struct {
@@ -36,42 +37,43 @@ type ItemResult struct {
 	Err           string
 }
 
-const time_out = 1
+const time_out = 30
 
 func main() {
 	// initialize the output structure
 	results.ContentLength = make(map[string]int)
 	results.TotalContentLength = 0
 
-	// create an http client, a list of urls and a channel to
-	// pass url fetch results back
+	// http client
 	client := new(http.Client)
 	ch := make(chan *ItemResult)
 
-	timer := time.AfterFunc(time.Second*time_out, func() {
-		fmt.Println("out of time")
-		os.Exit(0)
-	})
-	defer timer.Stop()
-
-	// fetch the contents of the list of urls in parallel
+	// fetch the contents in parallel
 	for i := 0; i < len(webPages); i++ {
 		go worker(client, webPages[i], ch)
 	}
 
-	// store the results as soon as they come in
+	timer := time.AfterFunc(time.Second*time_out, func() {
+		fmt.Println("Out of time!Could fetch partial pages only...\n")
+		close(ch)
+		print_results()
+		os.Exit(0)
+	})
+	defer timer.Stop()
+
 	for i := 0; i < len(webPages); i++ {
-		output := <-ch
-		// fmt.Printf("%s,\t%d bytes\n", output.Url, output.ContentLength)
-		results.ContentLength[output.Url] = output.ContentLength
-		results.TotalContentLength = results.TotalContentLength + output.ContentLength
+		output, ok := <-ch
+		if !ok {
+			fmt.Printf("channel is closed\n")
+			return
+		} else {
+			// fmt.Printf("%s,\t%d bytes\n", output.Url, output.ContentLength)
+			results.ContentLength[output.Url] = output.ContentLength
+			results.TotalContentLength = results.TotalContentLength + output.ContentLength
+		}
 	}
 
-	for key, element := range results.ContentLength {
-		fmt.Println(key, "-", element)
-	}
-	fmt.Println("\nTotalContentLength =", results.TotalContentLength)
-	fmt.Println(results)
+	print_results()
 
 }
 
@@ -108,4 +110,14 @@ func worker(client *http.Client, url string, ch chan *ItemResult) {
 	result.ContentLength = len(string(b))
 	ch <- &result
 	return
+}
+
+func print_results() {
+	for key, element := range results.ContentLength {
+		fmt.Println(key, "-", element)
+	}
+	fmt.Println("\nTotalContentLength =", results.TotalContentLength, "\n")
+	fmt.Println(results)
+	fmt.Println("\n")
+
 }
